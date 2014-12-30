@@ -1,0 +1,9 @@
+bc
+css-tidy
+ctags
+kernel-headers
+kernel-devel
+openssh
+pysolfc-music
+vim-enhanced
+vim-X11

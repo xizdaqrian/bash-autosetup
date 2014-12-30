@@ -1,0 +1,909 @@
+#!/bin/bash
+#=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=
+#
+#      _____      __  __  ___     __  __
+#     / ___/___  / /_/  |/  /__  / / / /___
+#     \__ \/ _ \/ __/ /|_/ / _ \/ / / / __ \
+#    ___/ /  __/ /_/ /  / /  __/ /_/ / /_/ /
+#   /____/\___/\__/_/  /_/\___/\____/ .___/
+#                                  /_/
+#       SetMeUp
+#       by Rodney Fisk <xizdaqrian@gmail.com>
+#       ver. 0.97 --> 2014 May 25
+#
+#       Install all the relevant packages,set up the environment, and setup
+#       links, to get the system where I want it.
+#
+#       Useful web links are in each section, as well as
+#       in the LAST section.
+#=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=
+
+#=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=
+# General TODOs
+#=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=
+# {{{
+# TODO: Also find out how to say yes to questions asked by the
+#       package installers, such as the MS fonts pkg.
+#       + Look at the 'expect' package
+# TODO: Don't use ubuntu-restriced-extras, because it contains
+#       the ttf-mscorefonts-installer package
+# TODO: Make script suitable for use on RH, BSD, Slack, Mac, Solaris,
+#       Arch, in addition to this Debian based setup.
+#       use 'uname -o'
+# TODO: Consider socat & netpipes on the list, if I find that I need them.
+# TODO: Give all functions, with file change ability, the ability to operate in
+#       simulation mode.
+# }}}
+#=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=
+
+
+
+#=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=
+# Variables
+#=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=
+# Arrays {{{
+PKG_LIST=( )
+PKGS_TO_INSTALL=( )
+# }}}
+# Color codes {{{
+readonly BLACK=$(tput setaf 0)
+readonly RED=$(tput setaf 1) #'\e[01;31m'
+readonly GREEN=$(tput setaf 2) #'\e[01;32m'
+readonly YELLOW=$(tput setaf 3)
+readonly BLUE=$(tput setaf 4)
+readonly MAGENTA=$(tput setaf 5)
+readonly CYAN=$(tput setaf 6)
+readonly WHITE=$(tput setaf 7)
+readonly NORMAL=$(tput sgr0)
+readonly BOLD=$(tput bold)
+readonly BLINK=$(tput blink)
+readonly REVERSE=$(tput smso)
+readonly UNDERLINE=$(tput smul)
+# }}}
+
+readonly PLATFORM=$( uname -i )
+readonly LOGFILE=/home/${USER}/setmeup.log
+# A few more globals are initialized at the end, just after main()
+#=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=
+
+
+
+#=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=
+# Environment stuff to reduce errors and help the script behave.
+# This is a powerful script and we don't want it getting out of control.
+#=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=
+set -e
+#=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=
+
+
+
+#=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=
+# cleanup() - cleanup anything leftover when script exits
+#=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=
+cleanup() { IFS=$OLD_IFS; }
+#=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=
+
+
+
+#=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=
+# check_interface() - Are we online? Only returns 1 or 0, no printed msgs
+#                   - usage: check_interface [interface]
+#=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=
+check_interface() { #{{{
+  if [[ ! -z "$1" ]]; then
+    if [[ "$( ifconfig | grep -o $1 )" = "$1" ]]; then
+      retval=0
+    else
+      retval=1
+    fi
+  else
+    if [[ "$( ifconfig | grep -o eth0 )" = "eth0" ]]; then
+      retval=0
+    elif [[ "$( ifconfig | grep -o wlan0 )" = "wlan0" ]]; then
+      retval=0
+    else
+      retval=1
+    fi
+  fi
+
+  return "$retval"
+
+} # }}}
+#=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=
+
+
+
+#=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=
+# handle_error() - print and log errors
+#=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=
+handle_error() { #{{{
+    echo
+    echo "$( date ): $@" >> "${LOGFILE}"
+    echo "$@"
+    exit 1
+} #}}}
+#=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=
+
+
+
+#=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=
+# check_requirements() - checks for the external files or programs needed to run
+# this script
+#=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=
+check_requirements() { #{{{
+  local readonly req_files=( "core.txt" "debian.txt" "arch.txt" "suse.txt" )
+  local readonly libdir=/home/${USER}/Dropbox/Linux/bin/shellscript/setmeup.d
+
+  header_line
+}  #}}}
+#=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=
+
+
+
+#=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=
+# print_help() - print out the usage instructions of this script
+#=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=
+print_help () { #{{{
+local readonly script_name=$( which $0 | xargs basename )
+
+cat <<End-of-Help
+    "${script_name}" - Download and install packages and setup custom
+              environment for yourself.
+
+    USAGE: "${script_name}" [-d DISTRO] [-i INTERFACE] [-o OS] -s
+           "${script_name}"  -h
+
+            -d set distribution to one of (ubuntu, redhat, suse)
+            -h show this help
+            -i use "interface" to name the network interface
+            -o set operating system to one of (linux, osx, *BSD,)
+            -s simulate all actions - test run, making no changes
+End-of-Help
+} #}}}
+#=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=
+
+
+
+#=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=
+# center_print() - print given string dead center (based on 80 columns)
+#                - usage: center_print "string" [color]
+#                - DOES NOT supply NEWLINES
+#=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=
+center_print() { #{{{
+  local readonly term_width=80
+  local pad_value=0
+  local readonly line="$1"
+  [[ "$#" = 2 ]] && local readonly color="$2"
+
+	pad_value=$(( (( ${term_width} - ${#line} )) / 2 ))
+	pad_value=$(( ${pad_value} + ${#line} ))
+
+	if [[ "$#" = 2 ]]; then
+    pad_value=$(( ${pad_value} + ${#color} ))
+    printf "%*s" ${pad_value} "${color}${line}"
+    printf "${NORMAL}"
+  else
+    printf "%*s" ${pad_value} "${line}"
+  fi
+} #}}}
+#=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=
+
+
+
+#=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=
+# header_line() - prints 80 col line w/optional title & 2nd line
+#               - usage: header_line [title]
+#               - if 2 titles supplied, it will put them on opposite ends of the
+#               title line, as the header for a table
+#=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=
+header_line() { #{{{
+  #readonly local title=""
+
+  if [[ $# = 0 ]]; then
+    for i in {0..79}; do printf "-"; done | tee -a "${LOGFILE}"
+    printf "\n" | tee -a "${LOGFILE}"
+  elif [[ $# = 1 ]]; then
+    for i in {0..79}; do printf "-"; done | tee -a "${LOGFILE}"
+    printf "\n" | tee -a "${LOGFILE}"
+    printf "$1\n" | tee -a "${LOGFILE}"
+    for i in {0..79}; do printf "-"; done | tee -a "${LOGFILE}"
+    printf "\n" | tee -a "${LOGFILE}"
+  else
+    for i in {0..79}; do printf "-"; done | tee -a "${LOGFILE}"
+    printf "\n" | tee -a "${LOGFILE}"
+    printf "%-40s%40s\n" "$1" "$2" | tee -a "${LOGFILE}"
+    for i in {0..79}; do printf "-"; done | tee -a "${LOGFILE}"
+    printf "\n" | tee -a "${LOGFILE}"
+  fi
+
+} #}}}
+#=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=
+
+
+
+#=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=
+# warn_no_gui() - Warn the user and confirm they want to run the script.
+#=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=
+warn_no_gui() { #{{{
+
+	IFS=$'\n'
+	local answer=""
+	local readonly old_ifs=$IFS
+	local readonly prompt="Are you sure you wish to continue? "
+	local retval=0
+	local readonly warning_colors="${RED}${BOLD}${REVERSE}"
+	local readonly warning=(  \
+   	"=-=-=-=-=   W A R N I N G !   =-=-=-=-="\
+	  "This script requires elevated privileges!"\
+	  "Make ABSOLUTELY SURE that you want to do this!"\
+	  "Don't run unless you have reviewed its contents!"\
+	  "Misuse can hose your system!"\
+	  )
+
+  for (( i=0 ; i < ${#warning[@]} ; i++ )); do
+    if [[ ${i} = 0 ]]; then
+      center_print "${warning[${i}]}" "${warning_colors}"
+      printf "\n"
+    else
+      center_print "${warning[${i}]}"
+      printf "\n"
+    fi
+  done
+
+  IFS=${old_ifs}
+	center_print "${prompt}" "${YELLOW}"
+
+	while read -ers -n 1 -p "Y/[N]" answer; do
+	  if [[ $answer = [YyNn] ]]; then
+	    [[ $answer = [yY] ]] && retval=0
+	    [[ $answer = [Nn] ]] && retval=1
+	    break
+	  fi
+    done
+
+  header_line "User warning issued"
+	return $retval
+} #}}}
+#=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=
+
+
+
+#=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=
+# Discover the OS / Distribution of the system on which this script is running.
+# This will control everything else in the script.
+# TODO: Prompt user if package manager can't be ascertained.
+# TODO: Backup all user data BEFORE starting this stuff.
+# TODO: Consider getting OS from 'cat /etc/lsb-release or something more
+#       reliable than uname -o
+# Package Managers:
+# Debian based - apt-get, aptitude
+# Redhat & derivatives - yum
+# SuSe - zypper
+# Arch & derivatives - pacman
+#=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=
+discover_sys_info() { #{{{
+  header_line "Discovering System Specs"
+
+	[[ -z $OS ]] && OS=$(uname -o)
+	[[ -z $DISTRO ]] && \
+	  readonly DISTRO=$(uname -v | awk '{ print $1 }' | awk -F "-" '{ print $2 }')
+
+
+	case $OS in
+	  *BSD)
+		  printf "Operating System is: $OS\n" | tee -a "${LOGFILE}"
+		  ;;
+	  Macintosh)
+	  	printf "Operating System is: $OS\n" | tee -a "${LOGFILE}"
+	  	;;
+	  OpenSolaris)
+	  	printf "Operating System is: $OS\n" | tee -a "${LOGFILE}"
+	  	;;
+	  *Linux)
+  		printf "Operating System is: $OS\n" | tee -a "${LOGFILE}"
+  		case $DISTRO in
+  		  Mint | *buntu | [Dd]ebian | [Bb]odhi)
+  		    printf "Distribution is: $DISTRO\n" | tee -a "${LOGFILE}"
+  		    PKG_MGR=apt-get
+  		    printf "Package Manager set to $PKG_MGR\n" | tee -a "${LOGFILE}"
+  		    ;;
+  		  Centos | RedHat | Fedora)
+  		    printf "Distribution is: $DISTRO\n" | tee -a "${LOGFILE}"
+  		    PKG_MGR=yum
+  		    printf "Package Manager set to $PKG_MGR\n" | tee -a "${LOGFILE}"
+  		    ;;
+  		  SuSe | OpenSuSe)
+  		    printf "Distribution is: $DISTRO\n" | tee -a "${LOGFILE}"
+  		    PKG_MGR=zypper
+  		    printf "Package Manager set to $PKG_MGR\n" | tee -a "${LOGFILE}"
+  		    ;;
+  		  *)
+  		    echo "Not Identified"
+  		    for MGR in apt-get pacman yum zypper; do
+  		      PKG_MGR=$( which $MGR )
+  		      printf "Package Manager set to $PKG_MGR\n" | tee -a "${LOGFILE}"
+            if [[ $PKG_MGR != "" ]]; then
+  		        break
+  		      fi
+  		    done
+  		    readonly PKG_MGR=$( basename $PKG_MGR )
+  		    ;;
+  		esac
+  		;;
+	    *)
+		;;
+	esac
+} #}}}
+#=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=
+
+
+
+#=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=
+# setup_logfile() - obvious
+#=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=
+setup_logfile() { #{{{
+  rm -f "${LOGFILE}" && touch "${LOGFILE}"
+  readonly local this_name="$( basename "$0" )"
+
+  printf "=============================================\n" > "${LOGFILE}"
+  printf "${this_name} started $( date )\n" >> "${LOGFILE}"
+  printf "=============================================\n" >> "${LOGFILE}"
+
+	if [[ ${SIMULATE} = 1 ]]; then
+    printf "==> SIMULATION Mode <==\n" >> "${LOGFILE}"
+	fi
+
+} #}}}
+#=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=
+
+
+
+#=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=
+# setup_dropbox() - Check, if necessary, install, and sync Dropbox
+# TODO: Make this work for non-ubuntu distributions
+#=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=
+setup_dropbox() { #{{{
+  header_line "Now checking for Dropbox..."
+
+  if [[ -f $(which dropbox) ]]; then
+    printf "%-40s%40s\n" "Dropbox executable located at:" "$(which dropbox)" | tee -a "${LOGFILE}"
+  	if [[ "$(dropbox status)" != "Up to date" ]]; then
+     	printf "${RED}Dropbox is not yet synced,${NORMAL}\n" | tee -a "${LOGFILE}"
+     	printf "Run this script again after sync is finished${NORMAL}\n" | tee -a "${LOGFILE}"
+     	printf "Dropbox not synced. Exiting. Re-run after Dropbox is synced" | tee -a "${LOGFILE}"
+      handle_error "$(dropbox status)"
+     	exit 1
+  	else
+  	 	printf "%-40s%40s\n" "Dropbox status is:" "$(dropbox status)" | tee -a "${LOGFILE}"
+   	 	header_line
+   	 	printf "It looks like we're ready\n"
+    fi
+  else
+    printf "Installing dropbox...\n" | tee -a "${LOGFILE}"
+    pushd "${PWD}"
+    cd /home/"${USER}" &&\
+        wget -O - "https://www.dropbox.com/download?plat=lnx.${PLAT}"\
+        | tar xzf -
+    /home/"${USER}"/.dropbox-dist/dropboxd
+    popd
+    printf "Exiting for dropbox to sync. Run "$0" again after sync is finished.\n"\
+        | tee -a "${LOGFILE}"
+    exit 0
+  fi
+
+  header_line
+} #}}}
+#=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=
+
+
+
+#=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=
+# read_file() - gets lines from files to populate pkg arrays
+#             - takes ONE parameter: a file name
+#=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=
+read_file() { #{{{
+    local line=""
+
+    while read line; do
+        eval echo "$line"
+    done < "$1"
+} #}}}
+#=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=
+
+
+
+#=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=
+# load_pkg_arrays() - Locate pkg lists and load them into arrays
+# TODO: use results from discover_system_info to iterate through files, rather
+# than naming them explicitly.
+#=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=
+load_pkg_arrays() {  #{{{
+  local readonly lib_dir=/home/${USER}/Dropbox/Linux/bin/shellscript/setmeup.d/
+  local readonly core_file=core.txt
+  local readonly debian_file=debian.txt
+  local readonly arch_file=arch.txt
+  local readonly suse_file=suse.txt
+
+  local readonly old_ifs="$IFS"
+  IFS=$'\n'
+
+  trap 'handle_error $LINENO $?' ERR
+  if [[ -f "${lib_dir}""${core_file}" ]]; then
+    readonly CORE_PKGS=( $(read_file  "${lib_dir}""${core_file}") )
+  else
+    handle_error "File not found: $core_file\n"
+  fi
+  case $PKG_MGR in
+    apt-get)
+      if [[ -f "${lib_dir}""${debian_file}" ]]; then
+        readonly DEBIAN_PKGS=( $(read_file "${lib_dir}""${debian_file}") )
+        PKG_LIST=( ${CORE_PKGS[@]} ${DEBIAN_PKGS[@]} )
+        printf "Package files CORE and DEBIAN loaded successfully\n" >> "${LOGFILE}"
+      else
+        handle_error "File not found: $debian_file\n"
+      fi
+      ;;
+    yum)
+      if [[ -f "${lib_dir}""${redhat_file}" ]]; then
+        readonly REDHAT_PKGS=( $(cat "${lib_dir}""${redhat_file}") )
+        PKG_LIST=( ${CORE_PKGS[@]} ${REDHAT_PKGS[@]} )
+        printf "Package files CORE and REDHAT loaded successfully\n" >> "${LOGFILE}"
+      else
+        handle_error "File not found: $redhat_file\n"
+      fi
+      ;;
+    pacman)
+      if [[ -f "${lib_dir}""${arch_file}" ]]; then
+        readonly ARCH_PKGS=( $(cat "${lib_dir}""${arch_file}") )
+        PKG_LIST=( ${CORE_PKGS[@]} ${ARCH_PKGS[@]} )
+        printf "Package files CORE and ARCH loaded successfully\n" >> "${LOGFILE}"
+      else
+        handle_error "File not found: $arch_file\n"
+      fi
+      ;;
+    yast|zypper)
+      if [[ -f "${lib_dir}""${suse_file}" ]]; then
+        readonly SUSE_PKGS=( $(cat "${lib_dir}""${suse_file}") )
+        PKG_LIST=( ${CORE_PKGS[@]} ${SUSE_PKGS[@]} )
+        printf "Package files CORE and SUSE loaded successfully\n" >> "${LOGFILE}"
+      else
+        handle_error "File not found: $suse_file\n"
+      fi
+      ;;
+  esac
+
+  IFS=${old_ifs}
+} # end load_pkg_arrays() }}}
+#=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=
+
+
+
+#=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=
+# determine_needed_pkgs() - Check to see what packages are installed
+#=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=
+determine_needed_pkgs() { # {{{
+  local pkg_name=""
+  local pkg=""
+  unset PKGS_TO_INSTALL &&\
+      PKGS_TO_INSTALL=( )
+  local readonly old_ifs="$IFS"
+  IFS=$'\n'
+
+  # Header for this section
+  header_line "Package Name" "Status"
+
+  # 2 column output - Name   Status
+  for pkg_name in ${PKG_LIST[@]}; do
+      if [[ -z "$(dpkg-query -W ${pkg_name} 2>/dev/null )" ]]; then
+          PKGS_TO_INSTALL=( "${PKGS_TO_INSTALL[@]}" "$pkg_name" )
+          printf "%-40s%40s\n" "$pkg_name" "to be installed" | tee -a "${LOGFILE}"
+      else
+          printf "%-40s%40s\n" "$pkg_name" "already Installed" | tee -a "${LOGFILE}"
+      fi
+  done
+
+  if [[  ${#PKGS_TO_INSTALL[@]} > 0  ]]; then
+      retval=0
+  else
+      retval=1
+  fi
+
+  IFS="${old_ifs}"
+  header_line
+  printf "\n%s\n" "${#PKGS_TO_INSTALL[@]} packages selected for installation" | tee -a "${LOGFILE}"
+  return $retval
+
+} #}}}
+#=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=
+
+
+
+#=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=
+# find_avail_pkgs()
+# -take the array PKGS_TO_INSTALL and use apt-cache to check if each item is in
+# the repo
+# -if not, log it and remove it from PKGS_TO_INSTALL
+#=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=
+find_avail_pkgs() { #{{{
+	local pkg_searcher
+
+# Header for this section
+  printf "Checking for availability in package repositories...\n" | tee -a "${LOGFILE}"
+  header_line "Package Name" "Availability"
+
+    local readonly old_ifs="$IFS"
+    IFS=$'\n'
+
+	if [[ ${PKG_MGR} = "apt-get" ]]; then
+      pkg_searcher=$(which apt-cache)
+	else
+	  pkg_searcher=$(which ${PKG_MGR})
+	fi
+
+  for (( i=0 ; i < ${#PKGS_TO_INSTALL[@]} ; i++ )); do
+    if [[ -z "$( ${pkg_searcher} search $( eval echo ${PKGS_TO_INSTALL[$i]} ) )" ]]; then
+      printf "%-40s%40s\n" "${PKGS_TO_INSTALL[$i]}" "unavailable" | tee -a "${LOGFILE}"
+      unset PKGS_TO_INSTALL[$i]
+    fi
+  done
+
+  center_print "------------" | tee -a "${LOGFILE}"
+  printf "\n" | tee -a "${LOGFILE}"
+  for ppkg in ${PKGS_TO_INSTALL[@]}; do
+    printf "%-40s%40s\n" "${ppkg}" "available" | tee -a "${LOGFILE}"
+  done
+
+  IFS="${old_ifs}"
+  header_line
+  printf "\n%s\n" "${#PKGS_TO_INSTALL[@]} packages available in repositories" | tee -a "${LOGFILE}"
+
+} # end find_available_pkgs }}}
+#=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=
+
+
+
+#=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=
+# discover_dropdown_console() - figure out which one to install, if possible
+#=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=
+discover_dropdown_console() { #{{{
+	header_line "Discovering Desktop Environment..."
+
+  case ${PKG_MGR} in
+    apt-get)
+      DeskEnv=$( cat /etc/X11/default-display-manager | xargs basename )
+      ;;
+    yum)
+      DeskEnv=$( cat /etc/sysconfig/desktop | xargs basename )
+      ;;
+    zypper)
+      DeskEnv=$( cat /etc/sysconfig/displaymanager | xargs basename )
+      ;;
+    *)
+      DeskEnv=$( /bin/ps -eo command -u root -U root u | sort -u | grep dm$ )
+      ;;
+  esac
+
+	case $DeskEnv in
+	    kdm )
+	        printf "KDE Found...including KDE specific packages.\n" | tee -a "${LOGFILE}"
+	        PKG_LIST=( "${PKG_LIST[@]}" "yakuake" "okular" )
+	        ;;
+	    gdm | gdm-binary )
+	        printf "GNOME Found...including GNOME specific packages.\n" | tee -a "${LOGFILE}"
+	        PKG_LIST=( "${PKG_LIST[@]}" "guake" "vim-gnome" )
+	        ;;
+	    mdm )
+	        printf "Maté Found...including GNOME specific packages.\n" | tee -a "${LOGFILE}"
+	        PKG_LIST=( "${PKG_LIST[@]}" "guake" "vim-gnome" )
+	        ;;
+	    lightdm )
+	        printf "Unity Found...including GNOME specific packages.\n" | tee -a "${LOGFILE}"
+	        PKG_LIST=( "${PKG_LIST[@]}" "guake" "vim-gnome" )
+	        ;;
+	    * )
+	        printf "Neither GNOME nor KDE found.\n" | tee -a "${LOGFILE}"
+	        ;;
+	esac
+
+	header_line
+} #}}}
+#=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=
+
+
+
+#=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=
+# setup_homedir() -Link everything in user's home directory from the stuff in
+# user's Dropbox directory.
+#=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=
+setup_homedir() { #{{{
+  #Section Header
+  header_line "Setting up links in HOME directory..."
+
+  # Simulation section - don't do, just print what would be done
+	if [[ $SIMULATE = 1 ]]; then
+	  pushd ${PWD}
+	  cd ~
+	  for file in /home/$USER/Dropbox/Linux/*
+	  do
+	    candidate=$(basename "$file")
+
+			if [[ -h ${candidate} ]]; then
+			  printf "${candidate} already linked\n" | tee -a "${LOGFILE}"
+		  else
+		    printf "rm -rf ${candidate} && ln -s ${file}\n" | tee -a "${LOGFILE}"
+        printf "${candidate} linked\n" | tee -a "${LOGFILE}"
+		  fi
+	  done
+
+	  printf "Linking vimrc...\n" | tee -a "${LOGFILE}"
+
+	  if [[ -h /home/${USER}/.vimrc ]]; then
+	    printf ".vimrc already linked\n" | tee -a "${LOGFILE}"
+  	else
+	    printf "rm -f /home/${USER}/.vimrc\n" | tee -a "${LOGFILE}"
+	    printf "ln -s /home/${USER}/.vim/vimrc ~/.vimrc\n" | tee -a "${LOGFILE}"
+    fi
+	  printf "Link setup COMPLETE\n" | tee -a "${LOGFILE}"
+    header_line
+  # NON-Simulation section - actual actions
+	else
+	  #set shell variable dotglob to parse dotfiles
+	  shopt -s dotglob
+	  pushd "${PWD}"
+	  cd /home/${USER}
+
+	  for file in /home/$USER/Dropbox/Linux/*
+	  do
+	    candidate=$(basename "$file")
+
+	    if [[ -h "${candidate}" ]]; then
+	      printf "${candidate} already linked\n" | tee -a "${LOGFILE}"
+	    else
+	      rm -rf "${candidate}" && ln -s "$file"
+	      printf "${candidate} linked\n" | tee -a "${LOGFILE}"
+	    fi
+	  done
+
+	  printf "Linking vimrc...\n" | tee -a "${LOGFILE}"
+	  rm -f /home/${USER}/.vimrc
+	  ln -s ~/.vim/vimrc ~/.vimrc
+	  printf "Link setup COMPLETE\n" | tee -a "${LOGFILE}"
+	  header_line
+	fi
+
+	popd
+}                   # }}}
+#=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=
+
+
+
+#=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=
+setup_fonts() {  #{{{
+  readonly local font_src=/home/${USER}/Downloads/fonts/
+  readonly local font_dest=/home/${USER}/.fonts/
+
+  header_line "Setting up fonts"
+
+  if [[ ! ${SIMULATE} = 1 ]]; then
+    mkdir -p /home/${USER}/.fonts/misc
+    mkdir -p /home/${USER}/.fonts/ttf
+    mkdir -p /home/${USER}/.fonts/Type1
+  fi
+
+  for folder in ${font_src}*; do
+    folder=$( echo "$folder" | xargs basename )
+    echo $folder
+    for file in $font_src$folder/*; do
+      candidate=$( echo $file | xargs basename | awk -F '.' '{ print tolower( $2 ) }')
+      case $candidate in
+        "pcf")
+          if [[ ${SIMULATE} = 1 ]]; then
+            printf "$( basename ${file}) copied to: ${font_dest}misc/${folder}\n" | tee -a "${LOGFILE}"
+          else
+            cp $file ${font_dest}"misc/"${folder} &&\
+            printf "$( basename ${file}) copied to: ${font_dest}misc/${folder}\n" | tee -a "${LOGFILE}"
+          fi
+          ;;
+        "ttf")
+          if [[ ${SIMULATE} = 1 ]]; then
+            printf "$( basename ${file}) copied to: ${font_dest}ttf/${folder}\n" | tee -a "${LOGFILE}"
+          else
+            cp $file ${font_dest}"ttf/"${folder} &&\
+            printf "$( basename ${file}) copied to: ${font_dest}ttf/${folder}\n" | tee -a "${LOGFILE}"
+          fi
+          ;;
+        "afm" | "pfb")
+          if [[ ${SIMULATE} = 1 ]]; then
+            printf "$( basename ${file}) copied to: ${font_dest}Type1/${folder}\n" | tee -a "${LOGFILE}"
+          else
+            cp $file ${font_dest}"Type1/"${folder} &&\
+            printf "$( basename ${file}) copied to: ${font_dest}Type1/${folder}\n" | tee -a "${LOGFILE}"
+          fi
+          ;;
+        *)
+          ;;
+      esac
+    done
+  done
+
+  header_line
+} #}}}
+#=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=
+
+#=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=
+# setup_lolcat() - Setup LOLcat, a colorizing script
+# TODO: always check for a newer version on github, if not, install local
+#=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=
+setup_lolcat() {  #{{{
+	header_line "Checking for LOLcat..."
+
+	if [[ $(which lolcat | xargs basename 2>/dev/null) ]]; then
+	  printf "LOLcat is already installed...\n" tee -a "${LOGFILE}"
+	elif [[ $SIMULATE = 1 ]]; then
+	  printf "Installing LOLcat...\n" tee -a "${LOGFILE}"
+	  printf "cd /home/${USER}/Downloads/Customize/colorizers/lolcat/\n" tee -a "${LOGFILE}"
+	  printf "sudo gem install lolcat\n" tee -a "${LOGFILE}"
+	else
+	  printf "Installing LOLcat...\n" tee -a "${LOGFILE}"
+	  pushd ${PWD}
+	  cd /home/${USER}/Downloads/Customize/colorizers/lolcat/
+	  sudo gem install lolcat
+	  popd
+	fi
+
+	header_line
+}  #}}}
+#=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=
+
+
+
+#=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=
+# final_instructions() - Remind me to 'rebash'
+#=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=
+final_instructions() {  #{{{
+echo -e "${tBold}${tCyan}\nSetup complete!\n \
+    execute . ~/.bashrc to setup environment${tReset}"
+}   #}}}
+#=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=
+
+
+
+#=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=
+# main() - obvious
+# hit 'm to return here anytime
+#=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=
+main() { #{{{
+  trap cleanup exit
+
+  setup_logfile
+
+  if ! warn_no_gui; then
+    printf "\nAborting on user request...$(date)" | tee -a "${LOGFILE}"
+    exit
+  fi
+
+
+  if check_interface "${INTERFACE}"; then
+    printf "Network interface is up\n" | tee -a "${LOGFILE}"
+    sleep 5
+  else
+    printf "Network interface is down... aborting\n" | tee -a "${LOGFILE}"
+    exit 1
+  fi
+
+  setup_dropbox
+	discover_sys_info
+  check_requirements
+  load_pkg_arrays
+  discover_dropdown_console
+
+  if determine_needed_pkgs; then
+    find_avail_pkgs
+  fi
+
+  setup_homedir
+  setup_fonts
+  setup_lolcat
+#  final_instructions
+}  #}}}
+#=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=
+
+
+
+#=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=
+# ===>  The Script <===
+#=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=
+while getopts "hsi:d:o:" OPTION; do
+  case $OPTION in
+    h)
+      print_help
+      exit 0
+      ;;
+    s)
+      readonly SIMULATE=1
+      ;;
+    i)
+      readonly INTERFACE="$OPTARG"
+      ;;
+    d)
+      readonly DISTRO="${OPTARG}"
+      ;;
+    o)
+      readonly OS="${OPTARG}"
+      ;;
+    ?)
+      print_help
+      exit 1
+      ;;
+  esac
+done
+
+main
+#=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=
+
+
+
+#=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=
+#                     Useful Websites, Articles, Etc.
+#=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=
+# {{{
+# pv - the pipe viewer, for progress bars
+# http://blog.allanglesit.com/2011/08/bash-using-pv-to-display-progress-of-dd/
+# http://mywiki.wooledge.org/BashPitfalls
+# http://www.pixelbeat.org/programming/shell_script_mistakes.html
+# http://www.stackoverflow.com/questions/78497/design-patterns-or-best-practices-for-shell-scripts
+ #Great Shell Parameter Expansion Tutorials
+ #http://theyougen.blogspot.com/2012/05/using-bash-shell-parameter-expansions.html
+ #http://www.gnu.org/software/bash/manual/html_node/Shell-Expansions.html
+# }}}
+#=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=
+
+
+
+#=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=
+#                     Changelog
+#=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=
+# {{{
+# ver 0.97     2014-May-25 - Parameters can be passed to the script for almost
+#                          - anyting
+#                          - Now checks for network connection up front
+#                          - Tightened up a little more logic
+#                          - a few more code formatting improvements
+# ver 0.96     2014-May-17 - More cleanup, most functions improved
+# ver 0.95     2014-May-15 - More code cleanup, also removing most colorization
+# ver 0.94     2014-May-11 - Streamlined output to screen / log
+#                          - Code beautification
+#                          - Improved log readability
+# ver 0.93     2014-May-09 - Improved logging output
+#                          - Improved screen output
+#                          - Improved logic/ reduced code size
+#                          - Working on improving error handling. Not finished
+# ver 0.92     2014-May-08 - Squash a few bugs
+#                          - Heavy rewrite of program logic
+#                          - Simplification of functions
+#                          - Improved format of info, both screen and logfile
+# ver 0.91     2014-May-05 - Begun error trapping
+#                          - Moved package lists out to other files
+#                          - found a few more const candidates & converted
+# ver 0.9      2014-May-04 - MAJOR rewrite of code:
+#                          - All instructions put into functions
+#                          - Every available variable converted to a constant
+#                          - Every available variable made local
+#                          - Simplification of some algorithms
+# ver 0.8      2014-Apr-01 - Begun fault tolerance & error handling
+# ver 0.7	     2014-Mar-26 - Updated dropbox checking routines.
+# ver 0.61     2014-Mar-09 - Added a few more packages to install
+# ver 0.6      2013-May-14 - "Simulation Mode" fully implemented.
+# ver 0.55     2013-May-13 - Help message, via -h implemented.
+# ver 0.5      2013-May-11 - Now able to fetch, install, and sync dropbox
+#                            before completing other tasks.
+#                          - Also check if requested packages are in repo
+# ver 0.4      2012-Oct-12 - Split packages into groups, based on distro and
+#                            Desktop Environment.
+# ver 0.3      2012-Oct-10 - Ability to check for & install non-package
+#                            programs. Currently font and lolcat.
+# ver 0.2      2012-Oct-07 - Warnings and colorized output.
+#=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=--=
+# }}}
+#+++sudo pip install dbgp vim-debug pep8 flake8 pyflakes
+# vim: set ts=2:sw=2:expandtab:
